@@ -36,45 +36,41 @@ def EADBReport():
     # Set up Excel Worksheet.
     work_book = Workbook()
     work_sheet = work_book.active
-    work_sheet.title = "EA Monthly Report"
-    work_sheet.append(['Archive Name', 'Year', 'Month', 'Total Exams', 'Total Size in MB', 'Average Exam Size in MB', 'Total Size in GB', 'Average Exam Size in GB'])
+    work_sheet.title = "EADBReport"
+    work_sheet.append(['Month', 'Archives', 'Retrieves', 'GB Archives', 'GB Retrieves'])
 
     # Assign font and background color properties for Column Title cells
     f = Font(name="Arial", size=14, bold=True, color="FF000000")
     fill = PatternFill(fill_type="solid", start_color="00FFFF00")
 
     # Format Worksheet columns
-    for L in "ABCDEFGH":
+    for L in "ABCDE":
         work_sheet[L + "1"].fill = fill
         work_sheet[L + "1"].font = f
         if L in "AD":
             work_sheet.column_dimensions[L].width = 25.0
         if L in "BC":
             work_sheet.column_dimensions[L].width = 10.0
-        if L in "EFGH":
+        if L in "E":
             work_sheet.column_dimensions[L].width = 35.0
 
     # Obtain Exam Volume for all virtual archives and write the data to excel sheet.
     for archive in virtual_archives:
 
-        # Variable used to sum up totals for Exam and storage volume
-        sum_of_exams = 0
-        sum_of_mb = 0
-        sum_of_gb = 0
+        # Variable used to sum up totals for Archive and Retrieve volume
+        totalArchives = 0
+        totalArchivesGB = 0
+        totalRetrieves = 0
+        totalRetrievesGB = 0
 
         # Obtains archive volume from SQL server.
         rows = archive_volume(archive)
         for row in rows:
-            average_exam_volume_in_gb = round((average_exam_size(row[2], row[3]) / 1024), 6)
-            # Adds archive name and exam volume to Worksheet.
-            work_sheet.append([archive,                             # Archive Name
-                               row[0],                              # Study By Year
-                               row[1],                              # Study By Month
-                               int(row[2]),                         # Total Exams
-                               round(row[3], 2),                    # Total Size in MB
-                               average_exam_size(row[2], row[3]),   # Average Exam Size in MB
-                               exam_size_in_gb(row[3]),             # Total Size in GB
-                               average_exam_volume_in_gb            # Average Exam Size in GB
+
+            # Adds sum of archives, retrieves, and GB per month
+            work_sheet.append([row[0],                              # Month
+                               row[1],                              # Sum of Archives
+                               int(row[2]),                         # Sum of Archives in GB
                                ])
             # Format cells to use 1000 comma separator.
             work_sheet['C{}'.format(work_sheet.max_row)].style = 'Comma [0]'
@@ -181,12 +177,12 @@ def archive_volume(db_name):
     # Execute query on Data Base.
     cur.execute("""
                 set transaction isolation level read uncommitted
-                select year(firstarchivedate) as studyyear, month(firstarchivedate) as studymonth,
-                count(distinct id1) as StudyCount, sum(bytesize/1024/1024) as sumofMB
+                select month(firstarchivedate) as studymonth,
+                count(distinct id1) as StudyCount, sum(bytesize/1024/1024/1024) as sumofGB
                 from ((tbldicomstudy left join tbldicomseries on tbldicomstudy.id1=tbldicomseries._id1)left join  tblfile on tbldicomseries.id2=tblfile._id2file)
-                where firstarchivedate > '2000-01-01' and firstarchivedate < getdate()
-                group by year(firstarchivedate), month(firstarchivedate)
-                order by year(firstarchivedate), Month(firstarchivedate)
+                where firstarchivedate > '2017-09-01' and firstarchivedate <'2017-11-30'
+                group by  month(firstarchivedate)
+                order by  Month(firstarchivedate)
                 """)
     rows = cur.fetchall()
     # Close SQL Server Connections.
