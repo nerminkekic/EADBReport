@@ -17,7 +17,7 @@ from email.mime.multipart import MIMEMultipart
 from email import encoders
 
 
-def ea_monthly_report():
+def EADBReport():
 
     """
     This function will do 4 tasks:
@@ -262,4 +262,4 @@ def format_date(db_date):
 
 
 # Run script
-ea_monthly_report()
+EADBReport()

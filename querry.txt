@@ -1,0 +1,15 @@
+
+--Retrieves volume per month and MB size
+select month(DayStart) as retreiveDay, count(StudyUID) as retreiveVolume, sum(BytesSent/1024/1024) as sumofMB from tblAuditTrailDicom with (nolock)
+where command = 16385 and completioncode =0and daystart >'20170901 07:30:00.000' and daystart <'20171129 07:30:00.000'
+group by month(DayStart)
+order by month(DayStart)
+
+--Archive Volume per month, and GB size
+set transaction isolation level read uncommitted
+select month(firstarchivedate) as studymonth,
+count(distinct id1) as StudyCount, sum(bytesize/1024/1024/1024) as sumofGB
+from ((tbldicomstudy left join tbldicomseries on tbldicomstudy.id1=tbldicomseries._id1)left join  tblfile on tbldicomseries.id2=tblfile._id2file)
+where firstarchivedate > '2017-09-01' and firstarchivedate <'2017-11-30'
+group by  month(firstarchivedate)
+order by  Month(firstarchivedate)
