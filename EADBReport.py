@@ -17,7 +17,7 @@ from email.mime.multipart import MIMEMultipart
 from email import encoders
 
 
-def EADBReport():
+def eadbreport():
 
     """
     This function will do 4 tasks:
@@ -30,6 +30,11 @@ def EADBReport():
     # File name for Excel Worksheet
     excel_filename = ""
 
+    # Define dictionary to store data for processing
+    septemberdata = {'archiveVolume': 0, 'archiveGB': 0}
+    octoberdata = {'archiveVolume': 0, 'archiveGB': 0}
+    novemberdata = {'archiveVolume': 0, 'archiveGB': 0}
+
     # Get all Virtual Archive names from SQL Server
     virtual_archives = get_archives()
 
@@ -37,7 +42,7 @@ def EADBReport():
     work_book = Workbook()
     work_sheet = work_book.active
     work_sheet.title = "EADBReport"
-    work_sheet.append(['Month', 'Archives', 'Retrieves', 'GB Archives', 'GB Retrieves'])
+    work_sheet.append(['Month', 'Archives', 'GB Archives', 'Retrieves', 'GB Retrieves'])
 
     # Assign font and background color properties for Column Title cells
     f = Font(name="Arial", size=14, bold=True, color="FF000000")
@@ -47,57 +52,54 @@ def EADBReport():
     for L in "ABCDE":
         work_sheet[L + "1"].fill = fill
         work_sheet[L + "1"].font = f
-        if L in "AD":
-            work_sheet.column_dimensions[L].width = 25.0
-        if L in "BC":
-            work_sheet.column_dimensions[L].width = 10.0
-        if L in "E":
-            work_sheet.column_dimensions[L].width = 35.0
+        work_sheet.column_dimensions[L].width = 35.0
 
     # Obtain Exam Volume for all virtual archives and write the data to excel sheet.
     for archive in virtual_archives:
 
         # Variable used to sum up totals for Archive and Retrieve volume
-        totalArchives = 0
-        totalArchivesGB = 0
-        totalRetrieves = 0
-        totalRetrievesGB = 0
-
         # Obtains archive volume from SQL server.
         rows = archive_volume(archive)
         for row in rows:
+            if row[0] == 9:
+                septemberdata['archiveVolume'] += row[1]
+                septemberdata['archiveGB'] += row[2]
+            elif row[0] == 10:
+                octoberdata['archiveVolume'] += row[1]
+                octoberdata['archiveGB'] += row[2]
+            if row[0] == 11:
+                novemberdata['archiveVolume'] += row[1]
+                novemberdata['archiveGB'] += row[2]
 
-            # Adds sum of archives, retrieves, and GB per month
-            work_sheet.append([row[0],                              # Month
-                               row[1],                              # Sum of Archives
-                               int(row[2]),                         # Sum of Archives in GB
-                               ])
-            # Format cells to use 1000 comma separator.
-            work_sheet['C{}'.format(work_sheet.max_row)].style = 'Comma [0]'
-            work_sheet['D{}'.format(work_sheet.max_row)].style = 'Comma'
-            work_sheet['E{}'.format(work_sheet.max_row)].style = 'Comma'
-            work_sheet['F{}'.format(work_sheet.max_row)].style = 'Comma'
+    # Adds sum of archives, retrieves, and GB per month
+    work_sheet.append(["September",                                 # Month
+                       septemberdata['archiveVolume'],              # Sum of Archives
+                       septemberdata['archiveGB'],                  # Sum of Archives in GB
+                       ])
 
-            # Add total Exam Volume, Total Size in MB and GB
-            sum_of_exams += row[2]
-            sum_of_mb += row[3]
-            sum_of_gb += exam_size_in_gb(row[3])
+    work_sheet.append(["October",                                   # Month
+                       octoberdata['archiveVolume'],                # Sum of Archives
+                       octoberdata['archiveGB'],                    # Sum of Archives in GB
+                       ])
 
+    work_sheet.append(["November",                                  # Month
+                       novemberdata['archiveVolume'],               # Sum of Archives
+                       novemberdata['archiveGB'],                   # Sum of Archives in GB
+                       ])
 
-        # Add sum volumes at the end of the report
-        work_sheet.append(["", "", "Total", sum_of_exams, sum_of_mb,"", sum_of_gb])
+    # Format cells to use 1000 comma separator.
+    work_sheet['C{}'.format(work_sheet.max_row)].style = 'Comma [0]'
+    work_sheet['D{}'.format(work_sheet.max_row)].style = 'Comma'
+    work_sheet['E{}'.format(work_sheet.max_row)].style = 'Comma'
+    work_sheet['F{}'.format(work_sheet.max_row)].style = 'Comma'
+    work_sheet['E{}'.format(work_sheet.max_row)].style = 'Comma'
 
-        # Format cells to use 1000 comma separator.
-        work_sheet['D{}'.format(work_sheet.max_row)].style = 'Comma'
-        work_sheet['E{}'.format(work_sheet.max_row)].style = 'Comma'
-        work_sheet['G{}'.format(work_sheet.max_row)].style = 'Comma'
-
-        print("Added {} Exam Volume to Workbook!".format(archive))
-        # Add blank line
-        work_sheet.append([])
+    print("Added {} Exam Volume to Workbook!".format(archive))
+    # Add blank line
+    work_sheet.append([])
 
     # Saves Excel worksheet.
-    excel_filename = "ASP_Monthly_Report_{}.xlsx".format(datetime.datetime.now().strftime("%Y-%m-%d"))
+    excel_filename = "EADBReport_{}.xlsx".format(datetime.datetime.now().strftime("%Y-%m-%d"))
     work_book.save(excel_filename)
 
     # Send email with attachment.
@@ -231,31 +233,11 @@ def send_email(file_attachment):
     s.close()
 
 
-# Perform calculation for Average Exam size in MB
-def average_exam_size(exam_volume, total_storage_size):
-    """Calculate average exam size in MB"""
-    return round((total_storage_size / exam_volume), 2)
-
-
 # Convert from MB to GB
 def exam_size_in_gb(size_in_mb):
     """Convert Average exam size in MB to GB"""
     return round((size_in_mb / 1024), 2)
 
 
-# Format Data Base time to use format MM-YYY
-def format_date(db_date):
-    """Format Data Base time to use format MM-YYY
-    """
-    try:
-        dt = datetime.date(int(db_date[0:4]), int(db_date[4:6]), 1)
-    except TypeError:
-        print("There is no valid Study Date in Data base!")
-    except Exception as e:
-        print(e)
-    else:
-        return dt.strftime("%b{}%y".format("-"))
-
-
 # Run script
-EADBReport()
+eadbreport()
