@@ -31,9 +31,7 @@ def eadbreport():
     excel_filename = ""
 
     # Define dictionary to store data for processing
-    septemberdata = {'archiveVolume': 0, 'archiveGB': 0}
-    octoberdata = {'archiveVolume': 0, 'archiveGB': 0}
-    novemberdata = {'archiveVolume': 0, 'archiveGB': 0}
+    eaData = {'sep':[9, 0, 0, 0, 0], 'oct': [10, 0, 0, 0, 0], 'nov': [11, 0, 0, 0, 0]}
 
     # Get all Virtual Archive names from SQL Server
     virtual_archives = get_archives()
@@ -56,36 +54,42 @@ def eadbreport():
 
     # Obtain Exam Volume for all virtual archives and write the data to excel sheet.
     for archive in virtual_archives:
-
-        # Variable used to sum up totals for Archive and Retrieve volume
         # Obtains archive volume from SQL server.
         rows = archive_volume(archive)
         for row in rows:
             if row[0] == 9:
-                septemberdata['archiveVolume'] += row[1]
-                septemberdata['archiveGB'] += row[2]
-            elif row[0] == 10:
-                octoberdata['archiveVolume'] += row[1]
-                octoberdata['archiveGB'] += row[2]
+                eaData['sep'][1] += row[1]      # Sum Total Archive
+                eaData['sep'][2] += row[2]      # Sum Total Archives GB
+            if row[0] == 10:
+                eaData['oct'][1] += row[1]      # Sum Total Archive
+                eaData['oct'][2] += row[2]      # Sum Total Archives GB
             if row[0] == 11:
-                novemberdata['archiveVolume'] += row[1]
-                novemberdata['archiveGB'] += row[2]
+                eaData['nov'][1] += row[1]      # Sum Total Archive
+                eaData['nov'][2] += row[2]      # Sum Total Archives GB
+
+        # Sum Retrieve volume and GB
+        rows = get_retrieves(archive)
+        for row in rows:
+            if row[0] == 9:
+                eaData['sep'][3] += row[1]                      # Sum Total Archive
+                eaData['sep'][4] += convert_to_gb(row[2])       # Sum Total Archives GB
+            if row[0] == 10:
+                eaData['oct'][3] += row[1]                      # Sum Total Archive
+                eaData['oct'][4] += convert_to_gb(row[2])       # Sum Total Archives GB
+            if row[0] == 11:
+                eaData['nov'][3] += row[1]                      # Sum Total Archive
+                eaData['nov'][4] += convert_to_gb(row[2])       # Sum Total Archives GB
+
+        print("Added {} Data to Workbook!".format(archive))
 
     # Adds sum of archives, retrieves, and GB per month
-    work_sheet.append(["September",                                 # Month
-                       septemberdata['archiveVolume'],              # Sum of Archives
-                       septemberdata['archiveGB'],                  # Sum of Archives in GB
-                       ])
-
-    work_sheet.append(["October",                                   # Month
-                       octoberdata['archiveVolume'],                # Sum of Archives
-                       octoberdata['archiveGB'],                    # Sum of Archives in GB
-                       ])
-
-    work_sheet.append(["November",                                  # Month
-                       novemberdata['archiveVolume'],               # Sum of Archives
-                       novemberdata['archiveGB'],                   # Sum of Archives in GB
-                       ])
+    for key in eaData.keys():
+        work_sheet.append([eaData[key][0],              # Month
+                           eaData[key][1],              # Sum of Archives
+                           eaData[key][2],              # Sum of Archives in GB
+                           eaData[key][3],              # Sum of Retrieves
+                           eaData[key][4],              # Sum of Retrieves in GB
+                           ])
 
     # Format cells to use 1000 comma separator.
     work_sheet['C{}'.format(work_sheet.max_row)].style = 'Comma [0]'
@@ -93,10 +97,6 @@ def eadbreport():
     work_sheet['E{}'.format(work_sheet.max_row)].style = 'Comma'
     work_sheet['F{}'.format(work_sheet.max_row)].style = 'Comma'
     work_sheet['E{}'.format(work_sheet.max_row)].style = 'Comma'
-
-    print("Added {} Exam Volume to Workbook!".format(archive))
-    # Add blank line
-    work_sheet.append([])
 
     # Saves Excel worksheet.
     excel_filename = "EADBReport_{}.xlsx".format(datetime.datetime.now().strftime("%Y-%m-%d"))
@@ -120,7 +120,7 @@ def get_archives():
         read_data = f.readline().split()
 
     # Define data base connection parameters.
-    sqlserver = 'SQL1'
+    sqlserver = read_data[2]
     database = 'RSAdmin'
     username = read_data[0]
     password = read_data[1]
@@ -151,6 +151,44 @@ def get_archives():
     return archive_list
 
 
+# Obtain Retrieves volume from SQL Server.
+def get_retrieves(db_name):
+    """
+    This function will obtain retrieve volume form SQL server.
+    """
+
+    # Read file for credentials
+    with open("data.txt", "r") as f:
+        read_data = f.readline().split()
+
+    # Define data base connection parameters.
+    sqlserver = read_data[2]
+    database = db_name
+    username = read_data[0]
+    password = read_data[1]
+
+    # Establish DB connections.
+    conn = pyodbc.connect(
+        r'DRIVER={SQL Server};'
+        r'SERVER=' + sqlserver + ';'
+        r'DATABASE=' + database + ';'
+        r'UID=' + username + ';'
+        r'PWD=' + password + ''
+    )
+    cur = conn.cursor()
+    # Execute query on Data Base.
+    cur.execute("""
+                select month(DayStart) as retreiveDay, count(StudyUID) as retreiveVolume, sum(BytesSent/1024/1024) as sumofMB from tblAuditTrailDicom with (nolock)
+                where command = 16385 and completioncode =0and daystart >'20170901 07:30:00.000' and daystart <'20171129 07:30:00.000'
+                group by month(DayStart)
+                order by month(DayStart)  
+                """)
+    rows = cur.fetchall()
+    # Close SQL Server Connections.
+    cur.close()
+    conn.close()
+    return rows
+
 # Obtain archive volume.
 def archive_volume(db_name):
     """
@@ -162,7 +200,7 @@ def archive_volume(db_name):
         read_data = f.readline().split()
 
     # Define data base connection parameters.
-    sqlserver = 'SQL1'
+    sqlserver = read_data[2]
     database = db_name
     username = read_data[0]
     password = read_data[1]
@@ -234,7 +272,7 @@ def send_email(file_attachment):
 
 
 # Convert from MB to GB
-def exam_size_in_gb(size_in_mb):
+def convert_to_gb(size_in_mb):
     """Convert Average exam size in MB to GB"""
     return round((size_in_mb / 1024), 2)
 
