@@ -91,12 +91,11 @@ def eadbreport():
                            eaData[key][4],              # Sum of Retrieves in GB
                            ])
 
-    # Format cells to use 1000 comma separator.
-    work_sheet['C{}'.format(work_sheet.max_row)].style = 'Comma [0]'
-    work_sheet['D{}'.format(work_sheet.max_row)].style = 'Comma'
-    work_sheet['E{}'.format(work_sheet.max_row)].style = 'Comma'
-    work_sheet['F{}'.format(work_sheet.max_row)].style = 'Comma'
-    work_sheet['E{}'.format(work_sheet.max_row)].style = 'Comma'
+        # Format cells to use 1000 comma separator.
+        work_sheet['B{}'.format(work_sheet.max_row)].style = 'Comma'
+        work_sheet['C{}'.format(work_sheet.max_row)].style = 'Comma'
+        work_sheet['D{}'.format(work_sheet.max_row)].style = 'Comma'
+        work_sheet['E{}'.format(work_sheet.max_row)].style = 'Comma'
 
     # Saves Excel worksheet.
     excel_filename = "EADBReport_{}.xlsx".format(datetime.datetime.now().strftime("%Y-%m-%d"))
